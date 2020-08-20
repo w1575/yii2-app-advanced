@@ -21,6 +21,12 @@ return [
             'namespace' => 'common\fixtures',
           ],
     ],
+    'modules' => [
+        'fastrbac' => [
+            'class' => 'w1575\FastRbac\Module',
+            'rbacFolder' => 'console/rbac',
+        ],
+    ],
     'components' => [
         'log' => [
             'targets' => [
