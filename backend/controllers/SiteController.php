@@ -1,6 +1,7 @@
 <?php
 namespace backend\controllers;
 
+use common\behaviors\ControllerBehavior;
 use Yii;
 use yii\web\Controller;
 use yii\filters\VerbFilter;
@@ -38,6 +39,7 @@ class SiteController extends Controller
                     'logout' => ['post'],
                 ],
             ],
+            ControllerBehavior::class,
         ];
     }
 
@@ -85,6 +87,7 @@ class SiteController extends Controller
             ]);
         }
     }
+
 
     /**
      * Logout action.

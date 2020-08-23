@@ -3,15 +3,18 @@
 namespace w1575\FastRbac\controllers;
 
 use w1575\FastRbac\models\Folder;
+use w1575\FastRbac\models\Permission;
 use yii\console\Controller;
 use w1575\ConsoleColorBehavior;
 
 /**
  * Default controller for the `w1575` module
  */
-class DefaultController extends Controller
+class InitController extends Controller
 {
-
+    /**
+     * @return array|string[] подключаем поведение, которое я скепал на скорую руку
+     */
     public function behaviors()
     {
         return [
@@ -58,7 +61,7 @@ class DefaultController extends Controller
         $console->info("3. Разрешений;");
         $console->success("Введите цифру (для выхода нажмите другой символ): ");
         $a = readline();
-
+        $console->line();
         switch ($a) {
             case 0 :
                 $console->warning("Производится инициализация Всего");
@@ -75,13 +78,19 @@ class DefaultController extends Controller
             default:
                 $console->danger("Выход");
         }
-
-
-
     }
 
-    public function actionUp()
+    /**
+     *
+     */
+    public function actionPermissionsUp()
     {
+        $console = $this->c;
+        $console->title("Инициализация разрешений");
+        $model = new Permission();
+        $model->loadData($this->module->rbacFolder);
 
     }
+
+
 }
