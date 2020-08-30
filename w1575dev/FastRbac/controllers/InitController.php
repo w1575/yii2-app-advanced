@@ -83,12 +83,20 @@ class InitController extends Controller
     /**
      *
      */
-    public function actionPermissionsUp()
+    public function actionPermissionsUp($entity = null)
     {
         $console = $this->c;
-        $console->title("Инициализация разрешений");
+        $console->title("Инициализация разрешений" . ($entity === null ? "." : " для сущности {$entity} ") );
         $model = new Permission();
-        $model->loadData($this->module->rbacFolder);
+        $isSaved = $model
+            ->loadData("{$this->module->rbacFolder}/permissions", $entity)
+            ->savePermissions()
+        ;
+        if ($isSaved->hasErrors() === false) {
+          $console->success("Разршения успешно добавлены в базу данных");
+        } else {
+            pred($isSaved->errors);
+        }
 
     }
 
