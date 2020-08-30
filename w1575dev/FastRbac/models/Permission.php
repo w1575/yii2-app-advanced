@@ -62,7 +62,19 @@ class Permission extends FileModel
             foreach ($entity as $name => $data) {
                 $this->item = $data;
                 $this->item['name'] = $name;
-                $isSuccess = $this->savePermission();
+                $permission = $this->savePermission();
+                if ($permission === false) {
+                    $transaction->rollBack();
+                    return $this;
+                }
+
+                $isSuccess = $this->addChildren($permission);
+                if ($isSuccess !== true) {
+                    $transaction->rollBack();
+                    return $this;
+                }
+
+                $isSuccess = $this->addParents($permission);
                 if ($isSuccess !== true) {
                     $transaction->rollBack();
                     return $this;
@@ -113,7 +125,66 @@ class Permission extends FileModel
             return false;
         }
 
-        return true;
+        return $permission;
+    }
 
+    /**
+     * Добавляет потомков к данному разрешению
+     * @return bool
+     */
+    public function addChildren($thisPermission)
+    {
+        if (isset($this->item['children']) === false or $this->item['children'] === []) {
+            return true;
+        }
+
+        $children = $this->item['children'];
+
+        foreach ($children as $index => $child) {
+            $childPermission = $this->auth->getPermission($child);
+
+            if ($childPermission === null) {
+                $this->addError('item', "Невозможно добавить дочернее разрешение {$child}! Убедитесь, что оно находится в списке выше, чем правило {$thisPermission->name}");
+                return false;
+            }
+
+            try {
+                $this->auth->addChild($thisPermission, $childPermission);
+            } catch (\Exception $e) {
+                $this->addError('item', "Невозможно добавить дочернее разрешение {$child} для разрешения {$childPermission->name}: {$e->getMessage()}");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Добавляет потомков к данному разрешению
+     * @return bool
+     */
+    public function addParents($thisPermission)
+    {
+        if (isset($this->item['parents']) === false or $this->item['parents'] === []) {
+            return true;
+        }
+
+        $parents = $this->item['parents'];
+
+        foreach ($parents as $index => $parent) {
+            $role = $this->auth->getRole($parent);
+
+            if ($role === null) {
+                $this->addError('item', "Невозможно добавить разрешение {$thisPermission->name} к роли {$role}. Убедитесь, что роль добавлена в базу");
+                return false;
+            }
+
+            try {
+                $this->auth->addChild($parent, $thisPermission);
+            } catch (\Exception $e) {
+                $this->addError('item', "Не удалось добавить разрешение {$thisPermission->name} к роли {$role}: {$e->getMessage()}");
+                return false;
+            }
+        }
+        return true;
     }
 }

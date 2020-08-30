@@ -6,6 +6,7 @@ use w1575\FastRbac\models\Folder;
 use w1575\FastRbac\models\Permission;
 use yii\console\Controller;
 use w1575\ConsoleColorBehavior;
+use yii\rbac\Item;
 
 /**
  * Default controller for the `w1575` module
@@ -97,6 +98,54 @@ class InitController extends Controller
         } else {
             pred($isSaved->errors);
         }
+    }
+
+    public function actionClear()
+    {
+        $console = $this->c;
+        $console->title("Полная очистка таблиц {{%auth_rule}}, {{%auth_item}}, {{%auth_assignment}}, {{%auth_item_child}}");
+        $console->warning("Вы уверены, что хотите произвести данное действие? (Y/N)");
+        $input = \readline();
+        if (mb_strtoupper($input) === "Y") {
+            \yii::$app->authManager->removeAll();
+            $console->success("Все данные успешно удалены");
+        }
+    }
+
+    /**
+     * @return false
+     */
+    public function actionRolesUp()
+    {
+        $this->c->title("Добавление  ролей в базу данных");
+
+        try {
+            $rolesList = require "{$this->module->rbacFolder}//roles.php";
+        } catch (\Exception $e) {
+            $this->c->danger("При загрузки ролей из файла произошла ошибка: {$e->getMessage()}");
+            return false;
+        }
+
+
+        if (empty($rolesList) === true) {
+            $this->c->warning("Список ролей пуст");
+            return false;
+        }
+
+        foreach ($rolesList as $name => $item) {
+            $auth = \yii::$app->authManager;
+            $item['name'] = $name;
+            $role = $auth->createRole($name);
+            $role->description = $item['description'];
+            try {
+                $auth->add($role);
+            } catch (\Exception $e) {
+                $this->c->danger("При добавлении роли {$name} произошла ошибка: {$e->getMessage()}");
+                return false;
+            }
+        }
+
+        $this->c->success("Все роли успешно добавлены в систему!");
 
     }
 
