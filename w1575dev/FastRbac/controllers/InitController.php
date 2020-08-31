@@ -19,9 +19,15 @@ class InitController extends Controller
     public function behaviors()
     {
         return [
-            'consoleColor' => ConsoleColorBehavior::class,
+
+                'consoleColor' => [
+                    'class' => ConsoleColorBehavior::class,
+                    'theme' => 'invert',
+                ],
         ];
     }
+
+
 
     /**
      * Подготовка папки в которой будут хранится данные по RBAC
@@ -117,6 +123,7 @@ class InitController extends Controller
      */
     public function actionRolesUp()
     {
+        // TODO: слишком раздутый метод. мне не нравится
         $this->c->title("Добавление  ролей в базу данных");
 
         try {
@@ -132,8 +139,11 @@ class InitController extends Controller
             return false;
         }
 
+        $auth = \yii::$app->authManager;
+
+        $transaction = \yii::$app->db->beginTransaction();
+
         foreach ($rolesList as $name => $item) {
-            $auth = \yii::$app->authManager;
             $item['name'] = $name;
             $role = $auth->createRole($name);
             $role->description = $item['description'];
@@ -141,12 +151,112 @@ class InitController extends Controller
                 $auth->add($role);
             } catch (\Exception $e) {
                 $this->c->danger("При добавлении роли {$name} произошла ошибка: {$e->getMessage()}");
+                $transaction->rollBack();
                 return false;
             }
         }
 
+        foreach ($rolesList as $name => $item) {
+            if (isset($item['children'])) {
+                $parent = $auth->getRole($name);
+                foreach ($item['children'] as $index => $child) {
+                    $child = $auth->getRole($child);
+                    try {
+                        $auth->addChild($parent, $child);
+                    } catch (\Exception $e) {
+                        $this->c->danger("При добавление к роли {$name} дочернего правила {$child->name} произошла ошибка: {$e->getMessage()}");
+                        $transaction->rollBack();
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // TODO: по факту дубликат кода. нужно изменить
+
+        foreach ($rolesList as $name => $item) {
+            if (isset($item['parents'])) {
+                $child = $auth->getRole($name);
+                foreach ($item['parents'] as $index => $parent) {
+                    $parent = $auth->getRole($parent);
+                    try {
+                        $auth->addChild($parent, $child);
+                    } catch (\Exception $e) {
+                        $this->c->danger("При добавление к роли {$name} дочернего правила {$child->name} произошла ошибка: {$e->getMessage()}");
+                        $transaction->rollBack();
+                        return false;
+                    }
+                }
+            }
+        }
+        try {
+            $transaction->commit();
+        } catch (\Exception $e) {
+            $this->c->danger("При добавлении данных в базу произошла ошибка: {$e->getMessage()}");
+        }
+
         $this->c->success("Все роли успешно добавлены в систему!");
 
+    }
+
+    /**
+     * Удялет все роли из базы данных
+     */
+    public function actionRolesDown()
+    {
+        $this->c->title("Удаление ролей из системы");
+        $auth = \yii::$app->authManager;
+        $this->c->warning("Вы действительно хотите продолжить? (Y)");
+        $input = \readline();
+        if (mb_strtoupper($input) === "Y") {
+            $auth->removeAllRoles();
+            $this->c->success("Все данные успешно удалены");
+            return true;
+        }
+        $this->c->info("Удаление ролей прервано.");
+    }
+
+    /**
+     * @param $entity
+     */
+    public function actionPermissionsDown($entity = null)
+    {
+        $title = "Удаление разрешений ";
+        if ($entity !== null) {
+            $title .= "сущности {$entity}";
+        }
+
+        $this->c->title($title);
+
+        if ($this->confirmAction() === true) {
+            if ($entity === null) {
+                $auth = \yii::$app->authManager;
+                $auth->removeAllPermissions();
+                $this->c->success("Все разрешения успешно удалены.");
+                return true;
+            } else {
+                $permission = new Permission();
+                $result = $permission
+                    ->loadData($this->module->rbacFolder, $entity)
+                    ->delete();
+                if ($result === true) {
+                    $this->c->success("Разрешения сущности {$entity} успешно удалены");
+                }
+            }
+        }
+    }
+
+    /**
+     * @return bool подтверждение действия пользователем
+     */
+    private function confirmAction()
+    {
+        $this->c->warning("Вы действительно хотите продолжить? Y/N");
+        $input = \readline();
+        if (mb_strtoupper($input) === "Y") {
+            return true;
+        }
+        return false;
     }
 
 

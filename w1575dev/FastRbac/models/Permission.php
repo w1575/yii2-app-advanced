@@ -22,6 +22,7 @@ class Permission extends FileModel
     public $item;
     public $rule;
 
+
     /**
      * @param $path string путь к директории с разрешениями
      * @param null $entity
@@ -40,7 +41,15 @@ class Permission extends FileModel
             }
         } else {
             try {
-                $this->data[$entity] = require "{$path}/{$entity}.php";
+                //$this->data[$entity] = require "{$path}/{$entity}.php";
+                $entitiesList = FileHelper::findFiles($path, ['only' => ["{$entity}.php"]]);
+
+                if ($entitiesList !== []) {
+                    $this->data[$entity] = require "{$entitiesList[0]}";
+                } else {
+                    die("При получении данных сущности {$entity} произошла ошибка: не удалось найти файл."); // не красиво, но пока оставлю
+                }
+                // TODO: очень корявый вариант. нужно переделать
             } catch (\Exception $e) {
                 die("При получении списка сущностей произошла ошибка: {$e->getMessage()}"); // не красиво, но пока оставлю
             }
@@ -68,21 +77,48 @@ class Permission extends FileModel
                     return $this;
                 }
 
-                $isSuccess = $this->addChildren($permission);
-                if ($isSuccess !== true) {
-                    $transaction->rollBack();
-                    return $this;
-                }
+            }
+        }
+        if ($this->saveParents() === true and $this->saveChildren() === true) {
+            $transaction->commit();
+            return $this;
+        }
+        $transaction->rollBack();
+        return $this;
+    }
 
+    /**
+     * @return bool сохраняет родителей для
+     */
+    public function saveParents()
+    {
+        foreach ($this->data as $index => $entity) {
+            foreach ($entity as $name => $data) {
+                $permission = $this->auth->getPermission($name);
                 $isSuccess = $this->addParents($permission);
                 if ($isSuccess !== true) {
-                    $transaction->rollBack();
-                    return $this;
+                    return false;
                 }
             }
         }
-        $transaction->commit();
-        return $this;
+        return true;
+    }
+
+    /**
+     * @return bool сохраняет связь правила-родителя с правилом-потомком
+     */
+    public function saveChildren()
+    {
+        foreach ($this->data as $index => $entity) {
+            foreach ($entity as $name => $data) {
+                $permission = $this->auth->getPermission($name);
+                $isSuccess = $this->addChildren($permission);
+                if ($isSuccess !== true) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -174,17 +210,39 @@ class Permission extends FileModel
             $role = $this->auth->getRole($parent);
 
             if ($role === null) {
-                $this->addError('item', "Невозможно добавить разрешение {$thisPermission->name} к роли {$role}. Убедитесь, что роль добавлена в базу");
+                $this->addError('item', "Невозможно добавить разрешение {$thisPermission->name} к роли {$parent}. Убедитесь, что роль добавлена в базу");
                 return false;
             }
 
             try {
-                $this->auth->addChild($parent, $thisPermission);
+                $this->auth->addChild($role, $thisPermission);
             } catch (\Exception $e) {
-                $this->addError('item', "Не удалось добавить разрешение {$thisPermission->name} к роли {$role}: {$e->getMessage()}");
+                $this->addError('item', "Не удалось добавить разрешение {$thisPermission->name} к роли {$role->name}: {$e->getMessage()}");
                 return false;
             }
         }
         return true;
     }
+
+    /**
+     * @param $entity string|null удаление разрешений из базы
+     */
+    public function delete()
+    {
+        $auth = $this->auth;
+
+        $data=array_shift($this->data);
+        // TODO: из-за корявого проектирования пришлось сделать так
+
+        foreach ($data as $index => $datum) {
+
+            $permission = $auth->getPermission($index);
+
+            if ($permission !== null) {
+                $auth->remove($permission);
+            }
+        }
+        return true;
+    }
+
 }
