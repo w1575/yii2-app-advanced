@@ -19,7 +19,14 @@ class Permission extends FileModel
         return end($array);
     }
 
+    /**
+     * @var
+     */
     public $item;
+
+    /**
+     * @var
+     */
     public $rule;
 
 
@@ -90,7 +97,7 @@ class Permission extends FileModel
     /**
      * @return bool сохраняет родителей для
      */
-    public function saveParents()
+    private function saveParents()
     {
         foreach ($this->data as $index => $entity) {
             foreach ($entity as $name => $data) {
@@ -107,7 +114,7 @@ class Permission extends FileModel
     /**
      * @return bool сохраняет связь правила-родителя с правилом-потомком
      */
-    public function saveChildren()
+    private function saveChildren()
     {
         foreach ($this->data as $index => $entity) {
             foreach ($entity as $name => $data) {

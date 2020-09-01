@@ -6,8 +6,12 @@ namespace w1575\FastRbac\controllers;
 
 use yii\helpers\Inflector;
 
-class MigrationController extends \yii\console\controllers\MigrateController
+class MigrateController extends \yii\console\controllers\MigrateController
 {
+
+    public $migrationPath = '@console/rbac/migrations';
+
+    // public $template = "@w1575/FastRbac/views/migrate/template.php";
 
     /***
      * Самый грязный способ - стащил из наследуемого класса :(
@@ -38,5 +42,15 @@ class MigrationController extends \yii\console\controllers\MigrateController
     public function actionGenerate($name = 'derp')
     {
         $className = $this->generateClassName($name);
+
+        $migrateData = $this->renderFile("@w1575/FastRbac/views/migrate/migration.php", [
+            'className' => $this->generateClassName('derp'),
+            'safeUpData' => "die(1)",
+            'safeDownData' => "die(0)",
+        ]);
+
+        // \Yii::getAlias("@w1575/FastRbac/views/migrate/migration.php")
+
+        file_put_contents(\Yii::getAlias("@console/rbac/migrations/1.php"), $migrateData);
     }
 }
